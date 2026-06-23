@@ -1,1 +1,419 @@
 
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Problem Management System (Realtime Dashboard)</title>
+    <style>
+        :root {
+            --primary-color: #9c27b0;
+            --secondary-color: #64748b;
+            --bg-color: #fafafa;
+            --text-main: #1e293b;
+            --accent: #e040fb;
+            --success-color: #10b981;
+            --danger-color: #ef4444;
+        }
+
+        body { 
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0; padding: 20px;
+        }
+
+        .dashboard-container { 
+            max-width: 1300px; margin: auto;
+            background: white; padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            border: 1px solid #e2e8f0;
+        }
+
+        .header-section {
+            display: flex; justify-content: space-between;
+            align-items: center; margin-bottom: 25px;
+            border-bottom: 2px solid #f1f5f9; padding-bottom: 15px;
+        }
+
+        h2, h3 { color: var(--primary-color); margin: 0; }
+
+        .search-box { position: relative; width: 300px; }
+        .search-box input {
+            width: 100%; padding: 10px 15px;
+            border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;
+        }
+
+        .add-btn {
+            background-color: var(--success-color); color: white;
+            padding: 10px 18px; border: none; border-radius: 8px;
+            font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap;
+        }
+
+        .summary-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 15px; margin-bottom: 25px;
+        }
+
+        .stat-card {
+            background: #ffffff; padding: 15px; border-radius: 10px;
+            border-left: 4px solid var(--accent); box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+            display: flex; flex-direction: column;
+        }
+
+        .stat-label { font-size: 12px; color: var(--secondary-color); text-transform: uppercase; font-weight: 600; }
+        .stat-value { font-size: 16px; font-weight: bold; color: var(--primary-color); margin-top: 5px; white-space: pre-line; }
+
+        .table-wrapper { overflow-x: auto; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 30px; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background-color: #f1f5f9; padding: 15px; font-size: 13px; font-weight: 600; color: #475569; text-align: left; white-space: nowrap; }
+        td { padding: 15px; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+
+        .link-btn, .edit-btn, .delete-btn {
+            padding: 5px 10px; text-decoration: none; border-radius: 4px;
+            font-size: 12px; cursor: pointer; border: none; display: inline-block; margin-right: 5px;
+        }
+        .link-btn { background: #f3e5f5; color: #7b1fa2; font-weight: 600; }
+        .edit-btn { background: #fef3c7; color: #d97706; font-weight: 600; }
+        .delete-btn { background: #fee2e2; color: #dc2626; font-weight: 600; }
+
+        .edit-section {
+            display: none; background: #fff; border: 2px solid #e2e8f0;
+            padding: 25px; border-radius: 12px; margin-top: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }
+        .form-group { display: flex; flex-direction: column; margin-bottom: 15px; }
+        .form-group.full-width { grid-column: span 2; }
+        label { font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 6px; }
+        input, select, textarea { padding: 10px; border: 1.5px solid #cbd5e1; border-radius: 6px; font-size: 14px; font-family: inherit; }
+
+        .btn-submit {
+            background-color: var(--primary-color); color: white; padding: 12px;
+            border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 15px;
+        }
+        .btn-submit:disabled { background-color: #cbd5e1; cursor: not-allowed; }
+
+        #success-message {
+            display: none; background-color: #dcfce7; color: #166534;
+            padding: 12px; border-radius: 6px; margin-bottom: 15px; text-align: center; font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+
+<div class="dashboard-container">
+    <div class="header-section">
+        <h2>ระบบจัดการและติดตามปัญหา (Problem Management System)</h2>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <button class="add-btn" onclick="openAddForm()">➕ เพิ่มรายการปัญหาใหม่</button>
+            <div class="search-box">
+                <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="ค้นหาข้อมูลปัญหาจากทุกคอลัมน์..."> 
+            </div>
+        </div>
+    </div>
+
+    <div class="summary-grid" id="summaryGrid">
+        <div class="stat-card">
+            <span class="stat-label">จำนวนปัญหาทั้งหมด</span>
+            <span class="stat-value" id="totalCount" style="font-size: 20px;">0 รายการ</span> 
+        </div>
+        <div class="stat-card" style="border-left-color: #f59e0b;">
+            <span class="stat-label">สรุปสถานะปัญหา (Status)</span>
+            <span class="stat-value" id="statusCount">-</span>
+        </div>
+        <div class="stat-card" style="border-left-color: #10b981;">
+            <span class="stat-label">สรุปวันเกิดเหตุ (Day)</span>
+            <span class="stat-value" id="dayCount">-</span> 
+        </div>
+        <div class="stat-card" style="border-left-color: #0284c7;">
+            <span class="stat-label">สรุปผู้แจ้งปัญหาล่าสุด</span>
+            <span class="stat-value" id="nameCount">-</span>
+        </div>
+    </div>
+
+    <div id="status" style="font-size: 12px; color: #94a3b8; margin-bottom: 10px;">กำลังเชื่อมต่อฐานข้อมูล Google Sheet...</div> 
+    
+    <div class="table-wrapper">
+        <div id="loading" style="text-align:center; padding: 20px;">กำลังดาวน์โหลดข้อมูลปัญล่าสุดจากชีต...</div> 
+        <div id="table-container"></div>
+    </div>
+
+    <div id="editSection" class="edit-section">
+        <h3 id="formTitle">✏️ บันทึกแก้ไขข้อมูลปัญหา (แถวเดิม)</h3> 
+        <div id="success-message">✓ บันทึกการแก้ไขลง Google Sheet เรียบร้อยแล้ว! กำลังดึงข้อมูลใหม่มาแสดงผล...</div>
+        
+        <form id="problemEditForm" onsubmit="handleFormSubmit(event)"> 
+            <div class="form-grid">
+                <div class="form-group"> 
+                    <label>ID (รหัสปัญหา) <span style="color:red">*สามารถระบุหรือแก้ไขรหัสได้เอง</span></label> 
+                    <input type="text" id="form_id" placeholder="กรอกรหัสปัญหา เช่น PRB-001" required>
+                </div>
+                <div class="form-group"> 
+                    <label>DateTime (วันเวลา)</label> 
+                    <input type="text" id="form_datetime" placeholder="เช่น 2026-06-23 08:00:00 หรือข้อความวันที่">
+                </div>
+                <div class="form-group"> 
+                    <label>Day (วัน)</label> 
+                    <select id="form_day">
+                        <option value="">-- เลือกวัน --</option>
+                        <option value="จันทร์">จันทร์</option>
+                        <option value="อังคาร">อังคาร</option>
+                        <option value="พุธ">พุธ</option>
+                        <option value="พฤหัสบดี">พฤหัสบดี</option>
+                        <option value="ศุกร์">ศุกร์</option>
+                        <option value="เสาร์">เสาร์</option>
+                        <option value="อาทิตย์">อาทิตย์</option>
+                    </select>
+                </div>
+                <div class="form-group"> 
+                    <label>Name (ชื่อผู้แจ้ง)</label> 
+                    <input type="text" id="form_name"> 
+                </div>
+                <div class="form-group"> 
+                    <label>Phone (เบอร์ติดต่อ)</label> 
+                    <input type="tel" id="form_phone"> 
+                </div>
+                <div class="form-group">
+                    <label>Status (สถานะ)</label>
+                    <select id="form_status"> 
+                        <option value="รอดำเนินการ (Pending)">รอดำเนินการ (Pending)</option>
+                        <option value="กำลังแก้ไข (In Progress)">กำลังแก้ไข (In Progress)</option> 
+                        <option value="แก้ไขเสร็จสิ้น (Resolved)">แก้ไขเสร็จสิ้น (Resolved)</option> 
+                        <option value="ยกเลิก (Cancelled)">ยกเลิก (Cancelled)</option> 
+                    </select>
+                </div>
+                <div class="form-group full-width">
+                    <label>Problem (Eng)</label> 
+                    <textarea id="form_prob_eng" rows="2" placeholder="รายละเอียดปัญหาภาษาอังกฤษ..."></textarea>
+                </div>
+                <div class="form-group full-width">
+                    <label>Problem (Thai)</label> 
+                    <textarea id="form_prob_thai" rows="2" placeholder="รายละเอียดปัญหาภาษาไทย..."></textarea> 
+                </div> 
+                <div class="form-group full-width">
+                    <label>URL (ลิงค์ที่เกี่ยวข้อง)</label> 
+                    <input type="url" id="form_url" placeholder="https://example.com/issue-link">
+                </div>
+                <div class="form-group full-width"> 
+                    <label>หมายเหตุ</label> 
+                    <textarea id="form_notes" rows="2" placeholder="หมายเหตุเพิ่มเติม..."></textarea>
+                </div>
+                <div class="form-group full-width"> 
+                    <button type="submit" class="btn-submit" id="submitBtn">บันทึกข้อมูลปัญหา</button> 
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // อย่าลืมเปลี่ยน URL เว็บแอปพลิเคชันของคุณที่นี่ให้ถูกต้องหลัง Deploy ใหม่
+    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbw8bsgZk7GSgmfqDwFgLbmwLA7u-o2AsrdnPgJveo4FUQNRFfgsZ5mjxIQlydMtkWj7/exec';
+    let allData = []; 
+    let currentAction = 'update';
+
+    function init() {
+        document.getElementById('loading').style.display = 'block';
+        fetch(WEB_APP_URL + '?action=read') 
+            .then(response => response.json())
+            .then(data => {
+                allData = data; 
+                updateStats(allData); 
+                renderTable(allData); 
+            })
+            .catch(error => { 
+                console.error("Error fetching data:", error); 
+                document.getElementById('status').innerText = 'เกิดข้อผิดพลาด: ไม่สามารถดึงข้อมูลได้';
+            });
+    } 
+
+    function updateStats(data) {
+        document.getElementById('totalCount').innerText = data.length + ' รายการ';
+        const countFrequency = (keyName) => { 
+            let counts = {};
+            data.forEach(item => {
+                let actualKey = Object.keys(item).find(k => k.toLowerCase().includes(keyName.toLowerCase())) || keyName;
+                let val = item[actualKey] || "ไม่ระบุ"; 
+                counts[val] = (counts[val] || 0) + 1;
+            });
+            return Object.entries(counts).map(([key, val]) => key + ': ' + val).join('\n'); 
+        };
+
+        document.getElementById('statusCount').innerText = countFrequency('Status') || "-"; 
+        document.getElementById('dayCount').innerText = countFrequency('Day') || "-"; 
+        
+        let names = data.map(item => { 
+            let k = Object.keys(item).find(key => key.toLowerCase().includes('name') || key.toLowerCase().includes('ชื่อ')); 
+            return item[k] || ''; 
+        }).filter(n => n !== '');
+        let uniqueNames = [...new Set(names)].slice(0, 3).join(', '); 
+        document.getElementById('nameCount').innerText = uniqueNames ? uniqueNames + '...' : 'ไม่มีข้อมูล';
+    }
+
+    function renderTable(data) {
+        if (data.length === 0) {
+            document.getElementById('table-container').innerHTML = "<p style='padding:20px; text-align:center;'>ยังไม่มีข้อมูลบันทึกปัญหาในระบบ</p>";
+            document.getElementById('loading').style.display = 'none'; 
+            return;
+        }
+        
+        const headers = Object.keys(data[0]);
+        let html = '<table id="crmTable"><thead><tr>'; 
+        headers.forEach(h => { html += '<th>' + h + '</th>'; }); 
+        html += '<th>การจัดการ</th></tr></thead><tbody>';
+        
+        data.forEach((row, index) => { 
+        html += '<tr>'; 
+        headers.forEach(h => { 
+            let val = row[h] || "-"; 
+            if (typeof val === 'string' && (val.startsWith('http://') || val.startsWith('https://'))) { 
+                // เพิ่ม <span style="display:none;"> เพื่อให้ระบบ Search ตรวจเจอข้อความใน URL ได้ โดยไม่กระทบความสวยงามของปุ่ม
+                html += '<td><a href="' + val + '" class="link-btn" target="_blank">Link</a><span style="display:none;">' + val + '</span></td>'; 
+            } else {
+                html += '<td>' + val + '</td>'; 
+            }
+            });
+            html += '<td>';
+            html += '<button type="button" class="edit-btn" onclick="openEditForm(' + index + ')">แก้ไข</button>'; 
+            html += '<button type="button" class="delete-btn" onclick="handleDelete(' + index + ')">ลบ</button>';
+            html += '</td>';
+            html += '</tr>'; 
+        });
+        html += '</tbody></table>'; 
+        
+        document.getElementById('table-container').innerHTML = html; 
+        document.getElementById('loading').style.display = 'none'; 
+        document.getElementById('status').innerText = 'อัปเดตข้อมูลล่าสุดเมื่อ: ' + new Date().toLocaleString('th-TH');
+    }
+
+    function openAddForm() {
+        currentAction = 'create';
+        document.getElementById('editSection').style.display = 'block';
+        document.getElementById('formTitle').innerText = '➕ เพิ่มรายการปัญหาใหม่';
+        document.getElementById('submitBtn').innerText = 'บันทึกเพิ่มข้อมูลปัญหา';
+        
+        document.getElementById('problemEditForm').reset();
+        document.getElementById('form_id').value = '';
+        document.getElementById('form_datetime').value = new Date().toLocaleString('th-TH');
+        
+        window.scrollTo({ top: document.getElementById('editSection').offsetTop, behavior: 'smooth' });
+    }
+
+    function openEditForm(index) {
+        currentAction = 'update';
+        document.getElementById('formTitle').innerText = '✏️ บันทึกแก้ไขข้อมูลปัญหา (แถวเดิม)';
+        document.getElementById('submitBtn').innerText = 'บันทึกอัปเดตข้อมูลปัญหา';
+        
+        const row = allData[index]; 
+        document.getElementById('editSection').style.display = 'block';
+        const getVal = (partialKey) => { 
+            const key = Object.keys(row).find(k => k.toLowerCase().includes(partialKey.toLowerCase()));
+            return key ? row[key] : '';
+        };
+
+        document.getElementById('form_datetime').value = getVal('datetime') || getVal('วันเวลา'); 
+        document.getElementById('form_day').value = getVal('day') || getVal('วัน');
+        document.getElementById('form_name').value = getVal('name') || getVal('ชื่อ'); 
+        document.getElementById('form_phone').value = getVal('phone') || getVal('เบอร์'); 
+        document.getElementById('form_id').value = getVal('id') || getVal('รหัส'); 
+        document.getElementById('form_prob_eng').value = getVal('problem (eng)') || getVal('eng'); 
+        document.getElementById('form_prob_thai').value = getVal('problem (thai)') || getVal('thai'); 
+        document.getElementById('form_status').value = getVal('status') || getVal('สถานะ') || 'รอดำเนินการ (Pending)'; 
+        document.getElementById('form_url').value = getVal('url') || getVal('ลิงค์');
+        document.getElementById('form_notes').value = getVal('หมายเหตุ');
+
+        window.scrollTo({ top: document.getElementById('editSection').offsetTop, behavior: 'smooth' }); 
+    }
+
+    function handleFormSubmit(event) {
+        event.preventDefault();
+        const submitBtn = document.getElementById('submitBtn');
+        submitBtn.innerText = 'กำลังส่งข้อมูลไปบันทึกลง Sheet...'; 
+        submitBtn.disabled = true;
+
+        const payload = { 
+            action: currentAction,
+            id: document.getElementById('form_id').value, 
+            fields: { 
+                'DateTime (วันเวลา)': document.getElementById('form_datetime').value, 
+                'Day (วัน)': document.getElementById('form_day').value, 
+                'Name (ชื่อ)': document.getElementById('form_name').value, 
+                'Phone (เบอร์)': document.getElementById('form_phone').value, 
+                'Problem (Eng)': document.getElementById('form_prob_eng').value, 
+                'Problem (Thai)': document.getElementById('form_prob_thai').value, 
+                'Status (สถานะ)': document.getElementById('form_status').value, 
+                'URL (ลิงค์)': document.getElementById('form_url').value,
+                'หมายเหตุ': document.getElementById('form_notes').value 
+            }
+        };
+
+        fetch(WEB_APP_URL, { 
+            method: 'POST', 
+            body: JSON.stringify(payload) 
+        })
+        .then(res => res.json())
+        .then(res => {
+            if (res.status === 'error') {
+                alert('เกิดข้อผิดพลาด: ' + res.message);
+                submitBtn.disabled = false;
+                submitBtn.innerText = 'บันทึกข้อมูล';
+                return;
+            }
+            document.getElementById('success-message').innerText = '✓ บันทึกข้อมูลลง Google Sheet เรียบร้อยแล้ว!';
+            document.getElementById('success-message').style.display = 'block'; 
+            setTimeout(() => {
+                document.getElementById('success-message').style.display = 'none'; 
+                document.getElementById('editSection').style.display = 'none'; 
+                submitBtn.disabled = false; 
+                init(); 
+            }, 1500); 
+        })
+        .catch(error => { 
+            alert('เกิดข้อผิดพลาดในการเชื่อมต่อเพื่อบันทึกข้อมูล');
+            console.error(error); 
+            submitBtn.disabled = false; 
+        });
+    } 
+
+    function handleDelete(index) {
+        const row = allData[index];
+        const idKey = Object.keys(row).find(k => k.toLowerCase().includes('id') || k.toLowerCase().includes('รหัส')) || 'id';
+        const targetId = row[idKey];
+
+        if (confirm('คุณแน่ใจหรือไม่ว่าต้องการลบรายการรหัส "' + targetId + '" นี้ออกอย่างถาวร?')) {
+            document.getElementById('status').innerText = 'กำลังลบข้อมูลจาก Google Sheet...';
+            fetch(WEB_APP_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'delete', id: targetId })
+            })
+            .then(res => res.json())
+            .then(res => {
+                if (res.status === 'success') {
+                    alert('ลบข้อมูลเรียบร้อยแล้ว!');
+                    init();
+                } else {
+                    alert('เกิดข้อผิดพลาด: ' + res.message);
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('ไม่สามารถเชื่อมต่อเพื่อสั่งลบข้อมูลได้');
+            });
+        }
+    }
+
+    function filterTable() {
+        const filter = document.getElementById("searchInput").value.toLowerCase();
+        const rows = document.querySelectorAll("#crmTable tbody tr"); 
+        rows.forEach(row => { 
+            row.style.display = row.textContent.toLowerCase().includes(filter) ? "" : "none"; 
+        });
+    } 
+
+    init(); 
+</script>
+
+</body>
+</html>
